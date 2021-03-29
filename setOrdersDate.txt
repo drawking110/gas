@@ -1,0 +1,90 @@
+/*--------------------------------------------
+ * 受注日入出力
+ *
+ * 作成日：2019/05/07（最終更新日：2020/09/08）
+ *------------------------------------------*/
+function setOrdersDate() {
+  
+  //::::::::::::::::::::::::::::::::::
+  // 定数
+  //::::::::::::::::::::::::::::::::::
+  
+  //[対象案件]シート
+  const mainRow = 6;  //開始行
+  const mainCol = 2;  //基準列
+  const mcCount = 20; //対象列数
+  
+  //[受注・入社]シート（の新規受注のほう）
+  const refRow = 4;   //開始行
+  const refCol = 1;   //基準列
+  const rcCount = 4;  //対象列数
+  
+  //::::::::::::::::::::::::::::::::::
+  // 変数の宣言と初期値の設定など
+  //::::::::::::::::::::::::::::::::::
+  
+  //[対象案件]シート
+  //----------------------------------
+  var mainSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("対象案件");  //シートオブジェクト
+  var mainNum = getRecordNumber(mainSheet, mainRow, 1);  //入力レコード数
+  var mainRec = mainSheet.getRange(mainRow, mainCol, mainNum, mcCount).getValues();  //値のセット（B6を起点）
+  
+  //[受注・入社]シート
+  //----------------------------------
+  var refSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("受注・入社")  //シートオブジェクト
+  var refNum = getRecordNumber(refSheet, refRow, refCol);  //入力レコード数
+  var refRec = refSheet.getRange(refRow, refCol, refNum, rcCount).getValues();  //値のセット（A4を起点）
+  
+  //前回までの内容をいったんクリア（[対象案件]シートのT列）
+  mainSheet.getRange(mainRow, 20, mainNum).clearContent();
+  
+  //=========================================
+  // メイン処理（企業ID・区分の判定と受注日の出力）
+  //=========================================
+  
+  for (var i = 0; i < mainNum; i++) {
+    /*　
+     *　紹介日が日付形式で入力されているもののみ処理対象
+     *　　※但し、横展開企業の場合は、紹介日が未入力の状態でも処理対象
+     */
+    if (Object.prototype.toString.call(mainRec[i][9]) === "[object Date]" || mainRec[i][14] == "○") {
+      
+      for (var j = 0; j < refNum; j++) {
+        //企業ID・一般/保全区分が一致するものは、[対象案件]シートのQ列に受注日を出力
+        if (mainRec[i][7] == refRec[j][0]) {
+          //一般・保全
+          if (mainRec[i][15] == "" || mainRec[i][15] == "保全") {
+            if ((mainRec[i][15] == "" && refRec[j][2].indexOf("保全") == -1 && refRec[j][3] == "") || (mainRec[i][15] == "保全" && (refRec[j][2].indexOf("保全") != -1 || refRec[j][3] != ""))) {
+              //受注が複数ある場合は、紹介日以降の最初の受注のみを反映させる（処理後はループjを抜ける）
+              if (mainSheet.getRange(i + mainRow, 20).getValue() == "" || mainRec[j][9] > mainSheet.getRange(i + mainRow, 20).getValue()) {
+                mainSheet.getRange(i + mainRow, 20).setValue(refRec[j][1]);
+                break;
+              }
+            }
+          }
+          //本社
+          else if (mainRec[i][15] == "本社") {
+            if (((mainRec[i][16] == "" || mainRec[i][16] == "一般") && (refRec[j][2].indexOf("保全") == -1 && refRec[j][3] == "")) || (mainRec[i][16] == "保全" && (refRec[j][2].indexOf("保全") != -1 || refRec[j][3] != ""))) {
+              //受注が複数ある場合は、紹介日以降の最初の受注のみを反映させる（処理後はループjを抜ける）
+              if (mainSheet.getRange(i + mainRow, 20).getValue() == "" || mainRec[j][9] > mainSheet.getRange(i + mainRow, 20).getValue()) {
+                mainSheet.getRange(i + mainRow, 20).setValue(refRec[j][1]);
+                break;
+              }
+            }
+          }
+        }
+      }
+      
+      //紹介日よりも受注日が先の場合はおかしいので、確認用として赤色に変更（但し、横展開企業の場合は除く）
+      if (mainRec[i][14] == "" && mainRec[i][9] > mainSheet.getRange(i + mainRow, 20).getValue() && mainSheet.getRange(i + mainRow, 20).getValue() != "") {
+        mainSheet.getRange(i + mainRow, 20).setFontColor("red");
+      }
+    }
+  }
+  
+  //[受注・入社]シートを非表示にする
+  refSheet.hideSheet();
+  
+  //処理終了のメッセージボックスを出力
+  //Browser.msgBox("受注日の更新処理が完了しました♪");
+}

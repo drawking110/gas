@@ -1,0 +1,91 @@
+/*--------------------------------------------
+ * 入社日入出力
+ *
+ * 作成日：2019/05/24（最終更新日：2020/09/08）
+ *------------------------------------------*/
+function setHireDate() {
+  
+  //::::::::::::::::::::::::::::::::::
+  // 定数
+  //::::::::::::::::::::::::::::::::::
+  
+  //[対象案件]シート
+  const mainRow = 6;  //開始行
+  const mainCol = 2;  //基準列
+  const mcCount = 20; //対象列数
+  
+  //[受注・入社]シート（の入社のほう）
+  const refRow = 4;   //開始行
+  const refCol = 6;   //基準列
+  const rcCount = 4;  //対象列数
+  
+  //::::::::::::::::::::::::::::::::::
+  // 変数の宣言と初期値の設定など
+  //::::::::::::::::::::::::::::::::::
+  
+  //[対象案件]シート
+  //----------------------------------
+  var mainSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("対象案件");  //シートオブジェクト
+  var mainNum = getRecordNumber(mainSheet, mainRow, 1);  //入力レコード数
+  var mainRec = mainSheet.getRange(mainRow, mainCol, mainNum, mcCount).getValues();  //値のセット（B6を起点）
+  
+  //[受注・入社]シート
+  //----------------------------------
+  var refSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("受注・入社");  //シートオブジェクト
+  var refNum = getRecordNumber(refSheet, refRow, refCol);  //入力レコード数
+  var refRec = refSheet.getRange(refRow, refCol, refNum, rcCount).getValues();  //値のセット（F4を起点）
+  
+  //前回までの内容をいったんクリア（[対象案件]シートのU列）
+  mainSheet.getRange(mainRow, 21, mainNum).clearContent();
+  
+  //=================================================
+  // メイン処理はここから
+  //=================================================
+  for (var i = 0; i < mainNum; i++) {
+    /*　
+     *　受注日が入力されている企業のみ処理対象
+     *　　※但し、横展開企業の場合は、紹介日が未入力の状態でも処理対象
+     */
+    if (mainRec[i][18] != "") {
+      
+      //[対象案件]シートの企業IDを、[受注・入社]シートの入社一覧から同一企業ID（同一区分）を探索
+      for (var j = 0; j < refNum; j++) {
+        /*------------- 一般・本社（一般）の場合 ------------- */
+        if (mainRec[i][15] == "" || (mainRec[i][15] == "本社" && (mainRec[i][16] == "" || mainRec[i][16] == "一般"))) {
+          
+          //企業IDが一致、一般区分の入社なおかつ受注日以降の入社の場合、入社日を[対象案件]シートの入社日欄（U列）に出力
+          if (refRec[j][0] == mainRec[i][7] && refRec[j][1].indexOf("保全") == -1 && refRec[j][3] >= mainRec[i][18]) {
+            
+            //入社が複数ある場合でも、最初の入社のみを反映させる（処理後はループ(j)を抜ける）
+            mainSheet.getRange(i + mainRow, 21).setValue(refRec[j][3]).getValues();
+            break;
+          }
+        }
+        /*------------- 保全・本社（保全）の場合 ------------- */
+        else if (mainRec[i][15] == "保全" || (mainRec[i][15] == "本社" && mainRec[i][16] == "保全")) {
+          
+          //企業IDが一致、保全区分の入社なおかつ受注日以降の入社の場合、入社日を[対象案件]シートの入社日欄（U列）に出力
+          if (refRec[j][0] == mainRec[i][7] && refRec[j][1].indexOf("保全") > -1 && refRec[j][3] >= mainRec[i][18]) {
+            
+            //入社が複数ある場合でも、最初の入社のみを反映させる（処理後はループ(j)を抜ける）
+            mainSheet.getRange(i + mainRow, 21).setValue(refRec[j][3]).getValues();
+            break;
+          }
+        }
+      }
+      
+      //受注日よりも入社日が先の場合はおかしいので、確認用として赤色に変更
+      if (mainSheet.getRange(i + mainRow, 21).getValue() != "") {
+        if (mainRec[i][18] > mainSheet.getRange(i + mainRow, 21).getValue())
+          mainSheet.getRange(i + mainRow, 21).setFontColor("red");
+      }
+      
+    }
+  }
+  
+  //[受注・入社]シートを非表示にする
+  refSheet.hideSheet();
+  
+  //処理終了のメッセージボックスを出力
+  //Browser.msgBox("入社日の更新処理が完了しました♪");
+}
